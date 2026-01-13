@@ -11,10 +11,10 @@ interface Asset {
 interface SeasonalityData {
   success: boolean;
   message?: string;
-  avg_2yr?: number[];
-  avg_5yr?: number[];
-  avg_10yr?: number[];
-  actual?: number[];
+  avg_2yr?: (number | null)[];
+  avg_5yr?: (number | null)[];
+  avg_10yr?: (number | null)[];
+  actual?: (number | null)[];
   target_year?: number;
 }
 
@@ -35,6 +35,9 @@ function App() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [appDataDir, setAppDataDir] = useState<string>("");
   const [dataStatus, setDataStatus] = useState<string>("Not loaded");
+  const [show10yr, setShow10yr] = useState(true);
+  const [show5yr, setShow5yr] = useState(true);
+  const [show2yr, setShow2yr] = useState(true);
 
   useEffect(() => {
     initializeApp();
@@ -71,8 +74,6 @@ function App() {
 
       if (result.success) {
         setDataStatus(`✓ Downloaded ${result.rows_added || 0} rows. Last date: ${result.last_date || 'N/A'}`);
-        // Auto-calculate after fetching
-        await handleCalculate();
       } else {
         setError(result.message || "Failed to fetch data");
         setDataStatus("Error fetching data");
@@ -218,14 +219,14 @@ function App() {
           )}
         </div>
 
-        {/* Chart */}
+        {/* Chart - Actual Year */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            {selectedAsset.name} - Seasonal Price Trends
+            {selectedAsset.name} - {selectedYear} Price Performance
           </h2>
 
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={500}>
+            <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
@@ -242,39 +243,18 @@ function App() {
                   label={{ value: 'Change (%)', angle: -90, position: 'insideLeft' }}
                 />
                 <Tooltip
-                  formatter={(value: any) => `${value?.toFixed(2)}%`}
+                  formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
                   labelFormatter={(day) => `Day ${day}`}
                 />
                 <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="10-Year Avg"
-                  stroke="#94a3b8"
-                  strokeWidth={1.5}
-                  dot={false}
-                  strokeDasharray="5 5"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="5-Year Avg"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="2-Year Avg"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  dot={false}
-                  strokeDasharray="3 3"
-                />
                 <Line
                   type="monotone"
                   dataKey={`${selectedYear}`}
                   stroke="#ef4444"
                   strokeWidth={3}
                   dot={false}
+                  name={`${selectedYear} Actual`}
+                  connectNulls={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -289,6 +269,102 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Chart - Historical Averages */}
+        {chartData.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Historical Seasonal Patterns
+              </h2>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={show10yr}
+                    onChange={(e) => setShow10yr(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">10-Year Avg</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={show5yr}
+                    onChange={(e) => setShow5yr(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">5-Year Avg</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={show2yr}
+                    onChange={(e) => setShow2yr(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">2-Year Avg</span>
+                </label>
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="day"
+                  label={{ value: 'Day of Year', position: 'insideBottom', offset: -5 }}
+                  ticks={[1, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
+                  tickFormatter={(day) => {
+                    const monthIndex = Math.floor((day - 1) / 30.4);
+                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    return months[Math.min(monthIndex, 11)];
+                  }}
+                />
+                <YAxis
+                  label={{ value: 'Change (%)', angle: -90, position: 'insideLeft' }}
+                />
+                <Tooltip
+                  formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
+                  labelFormatter={(day) => `Day ${day}`}
+                />
+                <Legend />
+                {show10yr && (
+                  <Line
+                    type="monotone"
+                    dataKey="10-Year Avg"
+                    stroke="#94a3b8"
+                    strokeWidth={2}
+                    dot={false}
+                    strokeDasharray="5 5"
+                    connectNulls={true}
+                  />
+                )}
+                {show5yr && (
+                  <Line
+                    type="monotone"
+                    dataKey="5-Year Avg"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    dot={false}
+                    connectNulls={true}
+                  />
+                )}
+                {show2yr && (
+                  <Line
+                    type="monotone"
+                    dataKey="2-Year Avg"
+                    stroke="#8b5cf6"
+                    strokeWidth={2.5}
+                    dot={false}
+                    strokeDasharray="3 3"
+                    connectNulls={true}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Info Box */}
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">

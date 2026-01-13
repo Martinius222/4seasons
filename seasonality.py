@@ -7,8 +7,13 @@ Handles data fetching from Yahoo Finance and seasonality calculations
 import sys
 import json
 import argparse
+import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Suppress all warnings to ensure clean JSON output
+warnings.filterwarnings('ignore')
+
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -166,6 +171,9 @@ def calculate_metrics(file_path, target_year):
             full_days.update(avg_by_day)
             full_days = full_days.interpolate(method='linear').fillna(0)
 
+            # Apply 7-day rolling average to smooth the seasonal pattern
+            full_days = full_days.rolling(window=7, center=True, min_periods=1).mean()
+
             return full_days.tolist()
 
         # Calculate averages for different periods
@@ -183,19 +191,21 @@ def calculate_metrics(file_path, target_year):
             first_close = target_df.iloc[0]['Close']
             target_df['PctChange'] = (target_df['Close'] / first_close - 1) * 100
 
-            # Create full 365-day array for actual data
+            # Create full 365-day array for actual data - NO interpolation into future
             actual_by_day = target_df.set_index('DayOfYear')['PctChange']
             full_actual = pd.Series(index=range(1, 366), dtype=float)
             full_actual.update(actual_by_day)
-            full_actual = full_actual.interpolate(method='linear')
+            # Only interpolate between existing data points, not into future
+            full_actual = full_actual.interpolate(method='linear', limit_area='inside')
             actual = full_actual.tolist()
 
+        # Convert NaN to None for valid JSON
         return {
             'success': True,
-            'avg_2yr': avg_2yr,
-            'avg_5yr': avg_5yr,
-            'avg_10yr': avg_10yr,
-            'actual': actual,
+            'avg_2yr': [None if pd.isna(x) else x for x in avg_2yr],
+            'avg_5yr': [None if pd.isna(x) else x for x in avg_5yr],
+            'avg_10yr': [None if pd.isna(x) else x for x in avg_10yr],
+            'actual': [None if pd.isna(x) else x for x in actual],
             'target_year': target_year
         }
 

@@ -1,7 +1,7 @@
-use std::path::PathBuf;
 use tauri::{command, AppHandle, Manager};
-use tauri::api::process::{Command, CommandEvent};
 use serde::{Deserialize, Serialize};
+use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SeasonalityResult {
@@ -9,10 +9,10 @@ struct SeasonalityResult {
     message: Option<String>,
     rows_added: Option<i32>,
     last_date: Option<String>,
-    avg_2yr: Option<Vec<f64>>,
-    avg_5yr: Option<Vec<f64>>,
-    avg_10yr: Option<Vec<f64>>,
-    actual: Option<Vec<f64>>,
+    avg_2yr: Option<Vec<Option<f64>>>,
+    avg_5yr: Option<Vec<Option<f64>>>,
+    avg_10yr: Option<Vec<Option<f64>>>,
+    actual: Option<Vec<Option<f64>>>,
     target_year: Option<i32>,
 }
 
@@ -36,6 +36,13 @@ async fn fetch_data(
     symbol: String,
     file_path: String,
 ) -> Result<SeasonalityResult, String> {
+    // Create parent directory if it doesn't exist
+    let path = std::path::Path::new(&file_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    }
+
     let sidecar_command = app.shell().sidecar("seasonality")
         .map_err(|e| format!("Failed to create sidecar command: {}", e))?
         .args(&["fetch", "--symbol", &symbol, "--file", &file_path]);
@@ -44,14 +51,25 @@ async fn fetch_data(
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
     let mut output = String::new();
+    let mut stderr_output = String::new();
     while let Some(event) = rx.recv().await {
-        if let CommandEvent::Stdout(line) = event {
-            output.push_str(&line);
+        match event {
+            CommandEvent::Stdout(line) => {
+                output.push_str(&String::from_utf8_lossy(&line));
+            }
+            CommandEvent::Stderr(line) => {
+                stderr_output.push_str(&String::from_utf8_lossy(&line));
+            }
+            _ => {}
         }
     }
 
-    serde_json::from_str(&output)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))
+    if !stderr_output.is_empty() {
+        eprintln!("Python stderr: {}", stderr_output);
+    }
+
+    serde_json::from_str(&output.trim())
+        .map_err(|e| format!("Failed to parse JSON: {} (output length: {}, stderr: {})", e, output.len(), stderr_output))
 }
 
 // Calculate seasonality metrics using the Python sidecar
@@ -69,14 +87,31 @@ async fn calculate_seasonality(
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
     let mut output = String::new();
+    let mut stderr_output = String::new();
     while let Some(event) = rx.recv().await {
-        if let CommandEvent::Stdout(line) = event {
-            output.push_str(&line);
+        match event {
+            CommandEvent::Stdout(line) => {
+                output.push_str(&String::from_utf8_lossy(&line));
+            }
+            CommandEvent::Stderr(line) => {
+                stderr_output.push_str(&String::from_utf8_lossy(&line));
+            }
+            _ => {}
         }
     }
 
-    serde_json::from_str(&output)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))
+    if !stderr_output.is_empty() {
+        eprintln!("Python stderr: {}", stderr_output);
+    }
+
+    // Debug: save output to file for inspection
+    if output.len() > 20000 {
+        std::fs::write("/tmp/tauri_calculate_output.txt", &output)
+            .unwrap_or_else(|e| eprintln!("Failed to write debug file: {}", e));
+    }
+
+    serde_json::from_str(&output.trim())
+        .map_err(|e| format!("Failed to parse JSON: {} (output length: {}, stderr: {})", e, output.len(), stderr_output))
 }
 
 // Read inventory file
