@@ -19,9 +19,30 @@ interface SeasonalityData {
 }
 
 const ASSETS: Asset[] = [
+  // Precious Metals
   { id: "gold", name: "Gold", symbol: "GC=F" },
   { id: "silver", name: "Silver", symbol: "SI=F" },
+  { id: "platinum", name: "Platinum", symbol: "PL=F" },
+  { id: "palladium", name: "Palladium", symbol: "PA=F" },
+
+  // Industrial Metals
+  { id: "copper", name: "Copper", symbol: "HG=F" },
+
+  // Energy
   { id: "oil", name: "Crude Oil", symbol: "CL=F" },
+  { id: "natgas", name: "Natural Gas", symbol: "NG=F" },
+  { id: "heating_oil", name: "Heating Oil", symbol: "HO=F" },
+  { id: "gasoline", name: "Gasoline", symbol: "RB=F" },
+
+  // Agricultural
+  { id: "corn", name: "Corn", symbol: "ZC=F" },
+  { id: "wheat", name: "Wheat", symbol: "ZW=F" },
+  { id: "soybeans", name: "Soybeans", symbol: "ZS=F" },
+  { id: "coffee", name: "Coffee", symbol: "KC=F" },
+  { id: "sugar", name: "Sugar", symbol: "SB=F" },
+  { id: "cotton", name: "Cotton", symbol: "CT=F" },
+
+  // Crypto & Indices
   { id: "bitcoin", name: "Bitcoin", symbol: "BTC-USD" },
   { id: "sp500", name: "S&P 500", symbol: "^GSPC" },
   { id: "eurusd", name: "EUR/USD", symbol: "EURUSD=X" },
@@ -227,11 +248,10 @@ function App() {
 
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} syncId="charts">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="day"
-                  label={{ value: 'Day of Year', position: 'insideBottom', offset: -5 }}
                   ticks={[1, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
                   tickFormatter={(day) => {
                     const monthIndex = Math.floor((day - 1) / 30.4);
@@ -246,7 +266,7 @@ function App() {
                   formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
                   labelFormatter={(day) => `Day ${day}`}
                 />
-                <Legend />
+                <Legend align="left" />
                 <Line
                   type="monotone"
                   dataKey={`${selectedYear}`}
@@ -309,11 +329,10 @@ function App() {
             </div>
 
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} syncId="charts">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="day"
-                  label={{ value: 'Day of Year', position: 'insideBottom', offset: -5 }}
                   ticks={[1, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
                   tickFormatter={(day) => {
                     const monthIndex = Math.floor((day - 1) / 30.4);
@@ -328,7 +347,7 @@ function App() {
                   formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
                   labelFormatter={(day) => `Day ${day}`}
                 />
-                <Legend />
+                <Legend align="left" />
                 {show10yr && (
                   <Line
                     type="monotone"
@@ -366,16 +385,6 @@ function App() {
           </div>
         )}
 
-        {/* Info Box */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-blue-900 mb-2">How to use:</h3>
-          <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>Select an asset from the dropdown</li>
-            <li>Click "Update Data" to fetch/update historical prices from Yahoo Finance</li>
-            <li>Select a year to analyze</li>
-            <li>Click "Calculate" to generate the seasonality chart</li>
-          </ol>
-        </div>
       </div>
     </div>
   );
