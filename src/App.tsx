@@ -11,6 +11,8 @@ interface Asset {
 interface SeasonalityData {
   success: boolean;
   message?: string;
+  rows_added?: number;
+  last_date?: string;
   avg_2yr?: (number | null)[];
   avg_5yr?: (number | null)[];
   avg_10yr?: (number | null)[];
