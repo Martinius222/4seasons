@@ -61,6 +61,9 @@ function App() {
   const [show10yr, setShow10yr] = useState(true);
   const [show5yr, setShow5yr] = useState(true);
   const [show2yr, setShow2yr] = useState(true);
+  const [yAxisDomain, setYAxisDomain] = useState<[number | 'auto', number | 'auto']>(['auto', 'auto']);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ y: number; domain: [number, number] } | null>(null);
 
   useEffect(() => {
     initializeApp();
@@ -148,6 +151,7 @@ function App() {
         }
 
         setChartData(transformed);
+        setYAxisDomain(['auto', 'auto']); // Reset Y-axis scale when new data is loaded
         setDataStatus(`✓ Data calculated for ${selectedYear}`);
       } else {
         setError(result.message || "Failed to calculate seasonality");
@@ -162,21 +166,61 @@ function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">4Seasons</h1>
-          <p className="text-gray-600">Commodity Seasonality Analysis</p>
-        </div>
+  const handleChartMouseDown = (e: React.MouseEvent) => {
+    if (!chartData.length) return;
 
-        {/* Controls */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    // Get current domain values
+    const actualData = chartData.map(d => d[`${selectedYear}`]).filter(v => v !== null && v !== undefined);
+    if (actualData.length === 0) return;
+
+    const currentMin = yAxisDomain[0] === 'auto' ? Math.min(...actualData) : yAxisDomain[0];
+    const currentMax = yAxisDomain[1] === 'auto' ? Math.max(...actualData) : yAxisDomain[1];
+
+    setIsDragging(true);
+    setDragStart({ y: e.clientY, domain: [currentMin, currentMax] });
+  };
+
+  const handleChartMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !dragStart) return;
+
+    const deltaY = e.clientY - dragStart.y;
+    const range = dragStart.domain[1] - dragStart.domain[0];
+    const scale = range / 400; // 400px chart height
+    const adjustment = deltaY * scale * 0.5; // Scale factor for sensitivity
+
+    const newMin = dragStart.domain[0] - adjustment;
+    const newMax = dragStart.domain[1] + adjustment;
+
+    setYAxisDomain([newMin, newMax]);
+  };
+
+  const handleChartMouseUp = () => {
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleChartDoubleClick = () => {
+    setYAxisDomain(['auto', 'auto']); // Reset to auto scale
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="flex h-screen">
+        {/* Sidebar */}
+        <div className="w-80 bg-slate-800/50 backdrop-blur-sm border-r border-slate-700/50 p-6 flex flex-col">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+              4Seasons
+            </h1>
+            <p className="text-slate-400 text-sm">Professional Commodity Seasonality Analysis</p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-col gap-6 flex-1">
             {/* Asset Selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Asset
               </label>
               <select
@@ -185,7 +229,7 @@ function App() {
                   const asset = ASSETS.find((a) => a.id === e.target.value);
                   if (asset) setSelectedAsset(asset);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               >
                 {ASSETS.map((asset) => (
                   <option key={asset.id} value={asset.id}>
@@ -197,7 +241,7 @@ function App() {
 
             {/* Year Selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Analysis Year
               </label>
               <input
@@ -206,73 +250,102 @@ function App() {
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                 min="2000"
                 max={new Date().getFullYear()}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-3">
               <button
                 onClick={handleFetchData}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-blue-500/50"
               >
                 {loading ? "Loading..." : "Update Data"}
               </button>
               <button
                 onClick={handleCalculate}
                 disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg hover:from-emerald-500 hover:to-emerald-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-emerald-500/50"
               >
                 Calculate
               </button>
             </div>
 
             {/* Status */}
-            <div className="flex items-end">
-              <p className="text-sm text-gray-600">{dataStatus}</p>
+            <div className="pt-4 border-t border-slate-700/50">
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Status</p>
+              <p className="text-sm text-slate-300">{dataStatus}</p>
             </div>
-          </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+            {/* Error Display */}
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Chart - Actual Year */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            {selectedAsset.name} - {selectedYear} Price Performance
-          </h2>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Chart - Actual Year */}
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-slate-100">
+                {selectedAsset.name} - {selectedYear} Price Performance
+              </h2>
+              <p className="text-xs text-slate-400">Drag vertically to zoom • Double-click to reset</p>
+            </div>
 
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData} syncId="charts">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="day"
-                  ticks={[1, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
-                  tickFormatter={(day) => {
-                    const monthIndex = Math.floor((day - 1) / 30.4);
-                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    return months[Math.min(monthIndex, 11)];
-                  }}
-                />
-                <YAxis
-                  label={{ value: 'Change (%)', angle: -90, position: 'insideLeft' }}
-                />
+            {chartData.length > 0 ? (
+              <div
+                onMouseDown={handleChartMouseDown}
+                onMouseMove={handleChartMouseMove}
+                onMouseUp={handleChartMouseUp}
+                onMouseLeave={handleChartMouseUp}
+                onDoubleClick={handleChartDoubleClick}
+                style={{ cursor: isDragging ? 'ns-resize' : 'default' }}
+              >
+                <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={chartData} syncId="charts">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis
+                    dataKey="day"
+                    ticks={[1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
+                    tickFormatter={(day) => {
+                      const monthStarts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+                      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                      const monthIndex = monthStarts.findIndex(start => start === day);
+                      return monthIndex >= 0 ? months[monthIndex] : "";
+                    }}
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fill: '#94a3b8' }}
+                  />
+                  <YAxis
+                    domain={yAxisDomain}
+                    label={{ value: 'Change (%)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8' } }}
+                    stroke="#64748b"
+                    style={{ fontSize: '12px', fill: '#94a3b8' }}
+                    tickFormatter={(value) => `${value.toFixed(1)}%`}
+                    width={60}
+                  />
                 <Tooltip
                   formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
                   labelFormatter={(day) => `Day ${day}`}
+                  contentStyle={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
+                    borderRadius: '8px',
+                    color: '#e2e8f0'
+                  }}
+                  labelStyle={{ color: '#94a3b8' }}
                 />
-                <Legend align="left" />
+                <Legend align="left" wrapperStyle={{ color: '#cbd5e1' }} />
                 <Line
                   type="monotone"
                   dataKey={`${selectedYear}`}
-                  stroke="#ef4444"
+                  stroke="#f43f5e"
                   strokeWidth={3}
                   dot={false}
                   name={`${selectedYear} Actual`}
@@ -280,11 +353,12 @@ function App() {
                 />
               </LineChart>
             </ResponsiveContainer>
+              </div>
           ) : (
-            <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <div className="flex items-center justify-center h-96 bg-slate-900/50 rounded-lg border-2 border-dashed border-slate-600">
               <div className="text-center">
-                <p className="text-gray-500 mb-4">No data to display</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-slate-400 mb-4 text-lg">No data to display</p>
+                <p className="text-sm text-slate-500">
                   Select an asset and click "Update Data" to fetch historical prices
                 </p>
               </div>
@@ -294,68 +368,80 @@ function App() {
 
         {/* Chart - Historical Averages */}
         {chartData.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-2xl p-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-slate-100">
                 Historical Seasonal Patterns
               </h2>
               <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={show10yr}
                     onChange={(e) => setShow10yr(e.target.checked)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-slate-800"
                   />
-                  <span className="text-sm text-gray-700">10-Year Avg</span>
+                  <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">10-Year Avg</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={show5yr}
                     onChange={(e) => setShow5yr(e.target.checked)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-slate-800"
                   />
-                  <span className="text-sm text-gray-700">5-Year Avg</span>
+                  <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">5-Year Avg</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={show2yr}
                     onChange={(e) => setShow2yr(e.target.checked)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-slate-800"
                   />
-                  <span className="text-sm text-gray-700">2-Year Avg</span>
+                  <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">2-Year Avg</span>
                 </label>
               </div>
             </div>
 
             <ResponsiveContainer width="100%" height={350}>
               <LineChart data={chartData} syncId="charts">
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                 <XAxis
                   dataKey="day"
-                  ticks={[1, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
+                  ticks={[1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]}
                   tickFormatter={(day) => {
-                    const monthIndex = Math.floor((day - 1) / 30.4);
+                    const monthStarts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
                     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    return months[Math.min(monthIndex, 11)];
+                    const monthIndex = monthStarts.findIndex(start => start === day);
+                    return monthIndex >= 0 ? months[monthIndex] : "";
                   }}
+                  stroke="#64748b"
+                  style={{ fontSize: '12px', fill: '#94a3b8' }}
                 />
                 <YAxis
-                  label={{ value: 'Change (%)', angle: -90, position: 'insideLeft' }}
+                  label={{ value: 'Change (%)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8' } }}
+                  stroke="#64748b"
+                  style={{ fontSize: '12px', fill: '#94a3b8' }}
                 />
                 <Tooltip
                   formatter={(value: any) => value !== null ? `${value?.toFixed(2)}%` : 'N/A'}
                   labelFormatter={(day) => `Day ${day}`}
+                  contentStyle={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #475569',
+                    borderRadius: '8px',
+                    color: '#e2e8f0'
+                  }}
+                  labelStyle={{ color: '#94a3b8' }}
                 />
-                <Legend align="left" />
+                <Legend align="left" wrapperStyle={{ color: '#cbd5e1' }} />
                 {show10yr && (
                   <Line
                     type="monotone"
                     dataKey="10-Year Avg"
-                    stroke="#94a3b8"
-                    strokeWidth={2}
+                    stroke="#60a5fa"
+                    strokeWidth={2.5}
                     dot={false}
                     strokeDasharray="5 5"
                     connectNulls={true}
@@ -365,7 +451,7 @@ function App() {
                   <Line
                     type="monotone"
                     dataKey="5-Year Avg"
-                    stroke="#3b82f6"
+                    stroke="#34d399"
                     strokeWidth={2.5}
                     dot={false}
                     connectNulls={true}
@@ -375,7 +461,7 @@ function App() {
                   <Line
                     type="monotone"
                     dataKey="2-Year Avg"
-                    stroke="#8b5cf6"
+                    stroke="#a78bfa"
                     strokeWidth={2.5}
                     dot={false}
                     strokeDasharray="3 3"
@@ -386,7 +472,7 @@ function App() {
             </ResponsiveContainer>
           </div>
         )}
-
+        </div>
       </div>
     </div>
   );
