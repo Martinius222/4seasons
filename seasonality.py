@@ -179,6 +179,7 @@ def calculate_metrics(file_path, target_year):
         # Calculate averages for different periods
         avg_2yr = normalize_years(2) if latest_year >= (target_year - 2) else []
         avg_5yr = normalize_years(5) if latest_year >= (target_year - 5) else []
+        avg_6yr = normalize_years(6) if latest_year >= (target_year - 6) else []
         avg_10yr = normalize_years(10) if latest_year >= (target_year - 10) else []
 
         # Get actual data for target year
@@ -204,6 +205,7 @@ def calculate_metrics(file_path, target_year):
             'success': True,
             'avg_2yr': [None if pd.isna(x) else x for x in avg_2yr],
             'avg_5yr': [None if pd.isna(x) else x for x in avg_5yr],
+            'avg_6yr': [None if pd.isna(x) else x for x in avg_6yr],
             'avg_10yr': [None if pd.isna(x) else x for x in avg_10yr],
             'actual': [None if pd.isna(x) else x for x in actual],
             'target_year': target_year

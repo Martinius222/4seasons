@@ -11,6 +11,7 @@ struct SeasonalityResult {
     last_date: Option<String>,
     avg_2yr: Option<Vec<Option<f64>>>,
     avg_5yr: Option<Vec<Option<f64>>>,
+    avg_6yr: Option<Vec<Option<f64>>>,
     avg_10yr: Option<Vec<Option<f64>>>,
     actual: Option<Vec<Option<f64>>>,
     target_year: Option<i32>,

@@ -15,6 +15,7 @@ interface SeasonalityData {
   last_date?: string;
   avg_2yr?: (number | null)[];
   avg_5yr?: (number | null)[];
+  avg_6yr?: (number | null)[];
   avg_10yr?: (number | null)[];
   actual?: (number | null)[];
   target_year?: number;
@@ -59,6 +60,7 @@ function App() {
   const [appDataDir, setAppDataDir] = useState<string>("");
   const [dataStatus, setDataStatus] = useState<string>("Not loaded");
   const [show10yr, setShow10yr] = useState(true);
+  const [show6yr, setShow6yr] = useState(true);
   const [show5yr, setShow5yr] = useState(true);
   const [show2yr, setShow2yr] = useState(true);
   const [yAxisDomain, setYAxisDomain] = useState<[number | 'auto', number | 'auto']>(['auto', 'auto']);
@@ -144,6 +146,7 @@ function App() {
             day: day + 1,
             month: monthLabel,
             "10-Year Avg": result.avg_10yr?.[day] || null,
+            "6-Year Avg": result.avg_6yr?.[day] || null,
             "5-Year Avg": result.avg_5yr?.[day] || null,
             "2-Year Avg": result.avg_2yr?.[day] || null,
             [`${selectedYear}`]: result.actual?.[day] || null,
@@ -386,6 +389,15 @@ function App() {
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
+                    checked={show6yr}
+                    onChange={(e) => setShow6yr(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-slate-800"
+                  />
+                  <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">6-Year Avg</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
                     checked={show5yr}
                     onChange={(e) => setShow5yr(e.target.checked)}
                     className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-slate-800"
@@ -444,6 +456,16 @@ function App() {
                     strokeWidth={2.5}
                     dot={false}
                     strokeDasharray="5 5"
+                    connectNulls={true}
+                  />
+                )}
+                {show6yr && (
+                  <Line
+                    type="monotone"
+                    dataKey="6-Year Avg"
+                    stroke="#fbbf24"
+                    strokeWidth={2.5}
+                    dot={false}
                     connectNulls={true}
                   />
                 )}
