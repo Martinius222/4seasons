@@ -17,6 +17,25 @@ struct SeasonalityResult {
     target_year: Option<i32>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct COTResult {
+    success: bool,
+    message: Option<String>,
+    rows_added: Option<i32>,
+    last_date: Option<String>,
+    dates: Option<Vec<String>>,
+    open_interest: Option<Vec<Option<f64>>>,
+    noncomm_net: Option<Vec<Option<f64>>>,
+    comm_net: Option<Vec<Option<f64>>>,
+    noncomm_long: Option<Vec<Option<f64>>>,
+    noncomm_short: Option<Vec<Option<f64>>>,
+    comm_long: Option<Vec<Option<f64>>>,
+    comm_short: Option<Vec<Option<f64>>>,
+    noncomm_net_change: Option<Vec<Option<f64>>>,
+    comm_net_change: Option<Vec<Option<f64>>>,
+    oi_change: Option<Vec<Option<f64>>>,
+}
+
 // Get the app data directory path
 #[command]
 async fn get_app_data_dir(app: AppHandle) -> Result<String, String> {
@@ -115,6 +134,85 @@ async fn calculate_seasonality(
         .map_err(|e| format!("Failed to parse JSON: {} (output length: {}, stderr: {})", e, output.len(), stderr_output))
 }
 
+// Fetch COT data using the Python sidecar
+#[command]
+async fn fetch_cot_data(
+    app: AppHandle,
+    symbol: String,
+    file_path: String,
+) -> Result<COTResult, String> {
+    // Create parent directory if it doesn't exist
+    let path = std::path::Path::new(&file_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    }
+
+    let sidecar_command = app.shell().sidecar("cot_data")
+        .map_err(|e| format!("Failed to create sidecar command: {}", e))?
+        .args(&["fetch", "--symbol", &symbol, "--file", &file_path]);
+
+    let (mut rx, _child) = sidecar_command.spawn()
+        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+
+    let mut output = String::new();
+    let mut stderr_output = String::new();
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line) => {
+                output.push_str(&String::from_utf8_lossy(&line));
+            }
+            CommandEvent::Stderr(line) => {
+                stderr_output.push_str(&String::from_utf8_lossy(&line));
+            }
+            _ => {}
+        }
+    }
+
+    if !stderr_output.is_empty() {
+        eprintln!("Python stderr: {}", stderr_output);
+    }
+
+    serde_json::from_str(&output.trim())
+        .map_err(|e| format!("Failed to parse JSON: {} (stderr: {})", e, stderr_output))
+}
+
+// Calculate COT metrics using the Python sidecar
+#[command]
+async fn calculate_cot_metrics(
+    app: AppHandle,
+    file_path: String,
+    years: i32,
+) -> Result<COTResult, String> {
+    let sidecar_command = app.shell().sidecar("cot_data")
+        .map_err(|e| format!("Failed to create sidecar command: {}", e))?
+        .args(&["calculate", "--file", &file_path, "--years", &years.to_string()]);
+
+    let (mut rx, _child) = sidecar_command.spawn()
+        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+
+    let mut output = String::new();
+    let mut stderr_output = String::new();
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line) => {
+                output.push_str(&String::from_utf8_lossy(&line));
+            }
+            CommandEvent::Stderr(line) => {
+                stderr_output.push_str(&String::from_utf8_lossy(&line));
+            }
+            _ => {}
+        }
+    }
+
+    if !stderr_output.is_empty() {
+        eprintln!("Python stderr: {}", stderr_output);
+    }
+
+    serde_json::from_str(&output.trim())
+        .map_err(|e| format!("Failed to parse JSON: {} (stderr: {})", e, stderr_output))
+}
+
 // Read inventory file
 #[command]
 async fn read_inventory(app: AppHandle) -> Result<String, String> {
@@ -165,6 +263,8 @@ pub fn run() {
         get_app_data_dir,
         fetch_data,
         calculate_seasonality,
+        fetch_cot_data,
+        calculate_cot_metrics,
         read_inventory,
         write_inventory
     ])

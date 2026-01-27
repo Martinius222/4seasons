@@ -39,7 +39,8 @@
       "../dist/seasonality"
     ],
     "externalBin": [
-      "binaries/seasonality"
+      "binaries/seasonality",
+      "binaries/cot_data"
     ]
   },
   "plugins": {}
